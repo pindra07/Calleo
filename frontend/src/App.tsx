@@ -1,0 +1,17 @@
+import { Routes, Route } from "react-router"
+import Lobby from "./screens/Lobby"
+import Room from "./screens/Room"
+
+function App() {
+
+  return (
+    <>
+      <Routes>
+        <Route path="/lobby" element={<Lobby />} />
+        <Route path="/room" element={<Room />} />
+      </Routes>
+    </>
+  )
+}
+
+export default App
