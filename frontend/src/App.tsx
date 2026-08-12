@@ -6,6 +6,7 @@ function App() {
 
   return (
     <>
+      WebRTC: Video Calling application
       <Routes>
         <Route path="/lobby" element={<Lobby />} />
         <Route path="/room" element={<Room />} />
