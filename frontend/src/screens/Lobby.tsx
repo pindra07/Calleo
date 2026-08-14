@@ -1,10 +1,12 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useSocket } from "../context/SocketProvider";
+import { useNavigate } from "react-router";
 
 export default function Lobby() {
   const [email, setEmail] = useState("");
   const [room, setRoom] = useState("");
   const socket = useSocket()
+  const navigate = useNavigate()
 
   const handleFormSubmit = useCallback((e) => {
     e.preventDefault()
@@ -12,10 +14,22 @@ export default function Lobby() {
     socket.emit('room:join', {
       email, room
     })
-    console.log({
-      email, room
-    })
+    console.log(email, room)
   }, [email, room, socket])
+
+  const handleJoinRoom = useCallback((data) => {
+    const {email, room} = data
+    navigate(`/room/${room}`)
+    console.log(email, room)
+  }, [])
+
+  useEffect(() => {
+    //@ts-ignore
+    socket.on("room:join", handleJoinRoom);
+    return () => {
+      socket.off("room:join", handleJoinRoom)
+    }
+  }, [socket, handleJoinRoom])
 
 
   return (

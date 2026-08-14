@@ -9,7 +9,7 @@ function App() {
       WebRTC: Video Calling application
       <Routes>
         <Route path="/lobby" element={<Lobby />} />
-        <Route path="/room" element={<Room />} />
+        <Route path="/room/:roomId" element={<Room />} />
       </Routes>
     </>
   )
