@@ -4,11 +4,11 @@ import peer from "../service/peer";
 
 export default function Room() {
   const socket = useSocket();
-  const [remoteSocketId, setRemoteSocketId] = useState(null);
-  const [myStream, setMyStream] = useState<MediaStream>(null);
+  const [remoteSocketId, setRemoteSocketId] = useState<string | null>(null);
+  const [myStream, setMyStream] = useState<MediaStream | null>(null);
   const myVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const [remoteStream, setRemoteStream] = useState();
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
   const handleUserJoined = useCallback(({ email, id }) => {
     console.log(`Email ${email} with socketId: ${id} joined the room`);
@@ -44,21 +44,37 @@ export default function Room() {
   );
 
   const sendStreams = useCallback(() => {
-    for (const of track of myStream.getTracks()) {
-      peer.peer.addTrack(track, myStream)
+    if (!myStream) return;
+    for (const track of myStream.getTracks()) {
+      peer.peer.addTrack(track, myStream);
     }
-  }, [])
+  }, [myStream]);
 
   const handleCallAccepted = useCallback(
-    ({ from, ans }) => {
-      peer.setLocalDescription(ans);
+    async ({ from, ans }) => {
+      await peer.setLocalDescription(ans);
       console.log("Call Accepted");
-      for (const track of myStream.getTracks()) {
-        peer.peer.addTrack(track, myStream);
-      }
+      sendStreams()
     },
-    [myStream],
+    [sendStreams],
   );
+
+  const handleNegoNeeded = useCallback(async () => {
+    const offer = await peer.getOffer();
+    socket.emit("peer:nego:needed", { offer, to: remoteSocketId });
+  }, [remoteSocketId, socket]);
+
+  const handleNegoNeedIncomming = useCallback(
+    async ({ from, offer }) => {
+      const ans = await peer.getAnswer(offer);
+      socket.emit("peer:nego:done", { to: from, ans });
+    },
+    [socket],
+  );
+
+const handleNegoNeedFinal = useCallback(async ({ans}) => {
+  await peer.setLocalDescription(ans)
+}, []) 
 
   useEffect(() => {
     if (myVideoRef.current && myStream) {
@@ -70,36 +86,27 @@ export default function Room() {
   }, [myStream, remoteStream]);
 
   useEffect(() => {
-    peer.peer.addEventListener("track", async (event) => {
-      const remoteStream = event.streams;
-      setRemoteStream(remoteStream);
-    });
+    const handleTrack = (event: RTCTrackEvent) => {
+      console.log("GOT TRACKS")
+
+      const [stream] = event.streams
+      if(stream) {
+        setRemoteStream(stream)
+      }
+    };
+    peer.peer.addEventListener("track", handleTrack);
+
+    return () => {
+      peer.peer.removeEventListener("track", handleTrack)
+    }
   }, []);
 
-  const handleNegoNeeded = useCallback(async () => {
-    const offer = await peer.getOffer();
-    socket.emit("peer:nego:needed", { offer, to: remoteSocketId });
-  }, [remoteSocketId, socket]);
-
   useEffect(() => {
-    peer.peer.addEvenetListener("negotiationneeded", handleNegoNeeded);
+    peer.peer.addEventListener("negotiationneeded", handleNegoNeeded);
     return () => {
-      peer.peer.removeEvenetListener("negotiationneeded", handleNegoNeeded);
+      peer.peer.removeEventListener("negotiationneeded", handleNegoNeeded);
     };
   }, [handleNegoNeeded]);
-
-  const handleNegoNeedIncomming = useCallback(
-    async ({ from, offer }) => {
-      const ans = await peer.getAnswer(offer);
-      socket.emit("peer:nego:done", { to: from, ans });
-    },
-    [socket],
-  );
-
-  const handleNegoNeedFinal = () =>
-    useCallback(async ({ ans }) => {
-      await peer.setLocalDescription(ans);
-    }, []);
 
   useEffect(() => {
     socket.on("user:joined", handleUserJoined);
@@ -127,7 +134,7 @@ export default function Room() {
     <>
       <h1>Room Screen</h1>
       <h4>{remoteSocketId ? "Connected" : "No one in the room"}</h4>
-      {/* {myStream && <button onClick={}>Send Stream</button>} */}
+      {/* {myStream && <button onClick={sendStreams}>Send Stream</button>} */}
       {remoteSocketId && <button onClick={handleCallUser}>CALL</button>}
       {myStream && (
         <video
@@ -143,7 +150,6 @@ export default function Room() {
         <video
           ref={remoteVideoRef}
           autoPlay
-          muted
           playsInline
           width="500"
           height="300"

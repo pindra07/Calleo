@@ -3,7 +3,7 @@ import {Server} from "socket.io"
 const io = new Server(8000, {
     // @ts-ignore
     cors: {
-        origin: "http://localhost:5173"
+        origin: "*"
     }
 })
 
